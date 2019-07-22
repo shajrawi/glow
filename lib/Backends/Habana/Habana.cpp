@@ -817,9 +817,11 @@ allocateGraphTensors(Function *F) {
     if (llvm::isa<SaveNode>(N)) {
       continue;
     }
-    auto result = N.getNthResult(0);
-    tensors.emplace(&N, TensorHandle(result.getType(), N.getName(), nullptr,
-                                     IOType::Intermediate));
+    for (unsigned outNum = 0, e = N.getNumResults(); outNum != e; ++outNum) {
+      auto result = N.getNthResult(outNum);
+      tensors.emplace(&N, TensorHandle(result.getType(), N.getName(), nullptr,
+                                       IOType::Intermediate));
+    }
   }
   return tensors;
 }
@@ -1303,6 +1305,20 @@ HabanaBackend::compile(Function *F, const BackendOptions &opts) const {
       }
       break;
     }
+    case Kinded::Kind::GatherRangesNodeKind: {
+      auto *GRNode = llvm::cast<GatherRangesNode>(&I);
+      std::vector<synTensor> inputs = {
+          tensors[GRNode->getData()].get(),
+          tensors[GRNode->getRanges()].get(),
+      };
+      chk(synCreateGenericNode(
+          inputs.data(), &tensors[GRNode].get(), inputs.size(), 2, nullptr,
+          getKernelName("gather_ranges", GRNode->getOutput().getElementType())
+              .c_str(),
+          GRNode->getName().data(), nullptr, nullptr));
+      multiInputs.emplace_back(std::move(inputs));
+      break;
+    }
     case Kinded::Kind::LengthsSumNodeKind: {
       auto *LSNode = llvm::cast<LengthsSumNode>(&I);
       std::vector<synTensor> inputs = {
@@ -1501,6 +1517,7 @@ bool HabanaBackend::isOpSupported(const NodeInfo &NI) const {
   case Kinded::Kind::TanhNodeKind:
   case Kinded::Kind::TileNodeKind:
   case Kinded::Kind::TransposeNodeKind:
+  case Kinded::Kind::GatherRangesNodeKind:
   case Kinded::Kind::LengthsSumNodeKind:
   case Kinded::Kind::SparseLengthsSumNodeKind:
   case Kinded::Kind::SparseLengthsWeightedSumNodeKind:

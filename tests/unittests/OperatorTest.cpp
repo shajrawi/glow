@@ -2101,7 +2101,7 @@ TEST_P(OperatorTest, GatherRangesDataInt64IdxInt64) {
 
 /// Test GatherRanges with Float data and Int32 indices.
 TEST_P(OperatorTest, GatherRangesDataFloatIdxInt32) {
-  ENABLED_BACKENDS(Interpreter, CPU);
+  ENABLED_BACKENDS(Interpreter, CPU, Habana);
   gatherRangesTest<float, int32_t>(bindings_, mod_, F_, EE_, ElemKind::FloatTy,
                                    ElemKind::Int32ITy);
 }
